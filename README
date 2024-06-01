@@ -1,0 +1,15 @@
+# GUI for PHP and MariaDB Containers running with Docker
+
+This is a simple GUI to manage PHP and MariaDB containers running with Docker made with Go and Fyne.
+
+## Build
+
+```bash
+go build -o php-mariadb-switcher-osx
+```
+
+## Run
+
+```bash
+sudo ./php-mariadb-switcher-osx
+```
