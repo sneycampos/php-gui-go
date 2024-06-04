@@ -13,6 +13,7 @@ import (
 	"fyne.io/fyne/v2/container"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/widget"
+    "fyne.io/fyne/v2/desktop"
 )
 
 const (
@@ -64,9 +65,9 @@ func stopMariaDBContainer() {
 }
 
 func stopPHPContainers() {
-    exec.Command("docker", "stop", "custom-php").Run()
-    exec.Command("docker", "stop", "dunglas/frankenphp:1-php8.2").Run()
-    exec.Command("docker", "stop", "dunglas/frankenphp:1-php8.3").Run()
+	exec.Command("docker", "stop", "custom-php").Run()
+	exec.Command("docker", "stop", "dunglas/frankenphp:1-php8.2").Run()
+	exec.Command("docker", "stop", "dunglas/frankenphp:1-php8.3").Run()
 }
 
 func buildCustomDockerImage(dockerfilePath string, label *widget.Label) (string, error) {
@@ -126,6 +127,20 @@ func runCustomContainer(dockerfilePath string, label *widget.Label) error {
 	return createPHPCommandScript(imageName)
 }
 
+func handleQuit(myApp fyne.App, myWindow fyne.Window) {
+	fmt.Println("Quitting...")
+
+	dialog := dialog.NewConfirm("Quit", "Are you sure you want to quit?", func(confirmed bool) {
+		if confirmed {
+			stopMariaDBContainer()
+			stopPHPContainers()
+			myApp.Quit()
+		}
+	}, myWindow)
+
+	dialog.Show()
+}
+
 func main() {
 	// Run in detached mode if called with "detached" argument
 	if len(os.Args) > 1 && os.Args[1] == "detached" {
@@ -138,6 +153,18 @@ func main() {
 	myApp := app.New()
 	myWindow := myApp.NewWindow("PHP & MariaDB Version Switcher")
 
+	if desk, ok := myApp.(desktop.App); ok {
+		myMenu := fyne.NewMenu("MyApp",
+			fyne.NewMenuItem("Show", func() {
+				myWindow.Show()
+			}),
+			fyne.NewMenuItem("Quit", func() {
+				handleQuit(myApp, myWindow)
+			}),
+		)
+		desk.SetSystemTrayMenu(myMenu)
+	}
+
 	label := widget.NewLabel("Select PHP Version:")
 
 	buttonMariaDB := widget.NewButton("Start MariaDB", func() {
@@ -148,6 +175,8 @@ func main() {
 		go func() {
 			if err := startMariaDBContainer(label); err != nil {
 				label.SetText(fmt.Sprintf("Error: %v", err))
+			} else {
+				label.SetText("MariaDB started.")
 			}
 		}()
 	})
@@ -206,6 +235,11 @@ func main() {
 		buttonCustom,
 	))
 
+	myWindow.SetCloseIntercept(func() {
+		myWindow.Hide()
+	})
+	myWindow.ShowAndRun()
+
 	// Handle application close event to stop containers
 	myWindow.SetOnClosed(func() {
 		stopMariaDBContainer()
@@ -215,6 +249,7 @@ func main() {
 	// Handle system signals for cleanup
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+
 	go func() {
 		<-sigChan
 		stopMariaDBContainer()
